@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { ListGroup } from "react-bootstrap";
 
 interface Task {
   id: number;
@@ -15,7 +16,7 @@ function TaskList() {
       .get("http://localhost:3000/api/tasks")
       .then((response) => {
         console.log(response.data);
-        let tasks: Task[] = JSON.parse(response.data);
+        let tasks: Task[] = response.data;
         setTasks(tasks);
       })
       .catch((error) => {
@@ -45,16 +46,17 @@ function TaskList() {
   return (
     <div>
       <h2>Task List</h2>
-      <ul>
-        {
-          /* {tasks.length > 0 ? (
-          tasks.map((task) => <li key={task.id}>{task.name}</li>)
+      <ListGroup variant="flush">
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <ListGroup.Item key={task.id}>{task.name}</ListGroup.Item>
+          ))
         ) : (
-          <li>No tasks available</li>
-        )} */
-          tasks.toString()
-        }
-      </ul>
+          <ListGroup.Item className="d-flex justify-content-center">
+            No Task Available
+          </ListGroup.Item>
+        )}
+      </ListGroup>
       {/* <input
         type="text"
         value={newTask}
