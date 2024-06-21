@@ -6,11 +6,13 @@ import (
 
 	"github.com/bigbluewhale111/rest_api/controllers"
 	"github.com/bigbluewhale111/rest_api/db"
+	"github.com/bigbluewhale111/rest_api/env"
 	"github.com/gorilla/mux"
 )
 
 func main() {
 	router := mux.NewRouter()
+	env.LoadEnvVars()
 	DB := db.Init()
 	c := controllers.New(DB)
 	router.HandleFunc("/api/tasks", c.GetAllTasks).Methods("GET")

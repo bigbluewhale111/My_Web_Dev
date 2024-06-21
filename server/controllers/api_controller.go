@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/bigbluewhale111/rest_api/models"
 	"github.com/gorilla/mux"
 )
+
+func setAccessControlAllowOrigin(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
+}
 
 func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) { //DONE
 
@@ -21,6 +26,7 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) { //DONE
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
+	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tasks)
 }
@@ -45,6 +51,7 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) { //DONE
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
+	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Created task successfully")
 }
@@ -60,6 +67,7 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) { //DONE
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
+	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(task)
 }
@@ -105,6 +113,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) { //DONE
 	}
 
 	w.Header().Add("Content-type", "application/json")
+	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Task updated successfully")
 }
@@ -127,6 +136,7 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) { //DONE
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
+	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Task deleted successfully")
 }
