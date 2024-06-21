@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -10,9 +11,7 @@ import (
 )
 
 func Init() *gorm.DB {
-	dbURL := "postgres://pg:pg_pass123@localhost:5433/task"
-
-	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(os.Getenv("DB")), &gorm.Config{})
 
 	if err != nil {
 		log.Fatalln(err)
