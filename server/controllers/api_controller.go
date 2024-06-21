@@ -112,7 +112,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if UpdateTask.Status != "" {
 		task.Status = UpdateTask.Status
 	}
-	if UpdateTask.DueDate != task.DueDate {
+	if UpdateTask.DueDate != 0 {
 		task.DueDate = UpdateTask.DueDate
 	}
 
