@@ -44,7 +44,7 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) { //DONE
 	var newtask models.NewTask
 	json.Unmarshal(body, &newtask)
 
-	if result := c.DB.Create(&models.Task{Name: newtask.Name, Description: newtask.Description, Status: newtask.Status}); result.Error != nil {
+	if result := c.DB.Create(&models.Task{Name: newtask.Name, Description: newtask.Description, Status: newtask.Status, DueDate: newtask.DueDate}); result.Error != nil {
 		fmt.Println("Error creating task:" + result.Error.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
@@ -103,6 +103,9 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) { //DONE
 	}
 	if UpdateTask.Status != "" {
 		task.Status = UpdateTask.Status
+	}
+	if UpdateTask.DueDate != task.DueDate {
+		task.DueDate = UpdateTask.DueDate
 	}
 
 	if result := c.DB.Save(&task); result.Error != nil {

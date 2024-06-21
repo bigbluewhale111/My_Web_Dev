@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { ListGroup } from "react-bootstrap";
+import { Table } from "react-bootstrap";
 
 interface Task {
   id: number;
@@ -46,24 +46,34 @@ function TaskList() {
   return (
     <div>
       <h2>Task List</h2>
-      <ListGroup variant="flush">
-        {tasks.length > 0 ? (
-          tasks.map((task) => (
-            <ListGroup.Item key={task.id}>{task.name}</ListGroup.Item>
-          ))
-        ) : (
-          <ListGroup.Item className="d-flex justify-content-center">
-            No Task Available
-          </ListGroup.Item>
-        )}
-      </ListGroup>
-      {/* <input
-        type="text"
-        value={newTask}
-        onChange={(e) => setNewTask(e.target.value)}
-        placeholder="New task name"
-      />
-      <button onClick={handleAddTask}>Add Task</button> */}
+      <Table striped bordered hover>
+        <thead>
+          <tr>
+            <th>Task Name</th>
+            <th>Last Name</th>
+            <th>Username</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Mark</td>
+            <td>Otto</td>
+            <td>@mdo</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Jacob</td>
+            <td>Thornton</td>
+            <td>@fat</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td colSpan={2}>Larry the Bird</td>
+            <td>@twitter</td>
+          </tr>
+        </tbody>
+      </Table>
     </div>
   );
 }
