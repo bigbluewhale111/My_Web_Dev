@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/bigbluewhale111/rest_api/models"
@@ -15,11 +14,11 @@ import (
 var testAuthorId uint32 = 0
 
 func setAccessControlAllowOrigin(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 }
 
 func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
-
+	setAccessControlAllowOrigin(w)
 	var tasks []models.Task
 	if result := c.DB.Find(&tasks, "author_id = ?", testAuthorId); result.Error != nil {
 		fmt.Println("Error fetching tasks:" + result.Error.Error())
@@ -28,7 +27,6 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
-	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tasks)
 }
@@ -36,6 +34,7 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
+	setAccessControlAllowOrigin(w)
 	if err != nil {
 		fmt.Println("Error reading body:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -59,7 +58,6 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
-	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Created task successfully")
 }
@@ -67,7 +65,7 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
-
+	setAccessControlAllowOrigin(w)
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -75,7 +73,6 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-type", "application/json")
-	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(task)
 }
@@ -86,7 +83,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
-
+	setAccessControlAllowOrigin(w)
 	if err != nil {
 		fmt.Println("Error reading body:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -124,7 +121,6 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-type", "application/json")
-	setAccessControlAllowOrigin(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Task updated successfully")
 }
@@ -132,7 +128,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
-
+	setAccessControlAllowOrigin(w)
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -142,6 +138,7 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	if result := c.DB.Delete(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		fmt.Println("Error deleting task:" + result.Error.Error())
+		setAccessControlAllowOrigin(w)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
