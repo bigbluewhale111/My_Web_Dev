@@ -8,6 +8,7 @@ type Task struct {
 	Description string    `json:"description"`
 	Status      string    `json:"status"`
 	DueDate     time.Time `json:"due_date"`
+	AuthorID    uint32    `json:"author_id"`
 }
 
 type NewTask struct {

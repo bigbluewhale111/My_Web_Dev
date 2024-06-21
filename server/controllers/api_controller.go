@@ -12,14 +12,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var testAuthorId uint32 = 0
+
 func setAccessControlAllowOrigin(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
 }
 
-func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) { //DONE
+func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 
 	var tasks []models.Task
-	if result := c.DB.Find(&tasks); result.Error != nil {
+	if result := c.DB.Find(&tasks, "author_id = ?", testAuthorId); result.Error != nil {
 		fmt.Println("Error fetching tasks:" + result.Error.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
@@ -31,7 +33,7 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) { //DONE
 	json.NewEncoder(w).Encode(tasks)
 }
 
-func (c controller) AddTask(w http.ResponseWriter, r *http.Request) { //DONE
+func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -44,7 +46,13 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) { //DONE
 	var newtask models.NewTask
 	json.Unmarshal(body, &newtask)
 
-	if result := c.DB.Create(&models.Task{Name: newtask.Name, Description: newtask.Description, Status: newtask.Status, DueDate: newtask.DueDate}); result.Error != nil {
+	if result := c.DB.Create(&models.Task{
+		Name:        newtask.Name,
+		Description: newtask.Description,
+		Status:      newtask.Status,
+		DueDate:     newtask.DueDate,
+		AuthorID:    testAuthorId,
+	}); result.Error != nil {
 		fmt.Println("Error creating task:" + result.Error.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
@@ -56,12 +64,12 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) { //DONE
 	json.NewEncoder(w).Encode("Created task successfully")
 }
 
-func (c controller) GetTask(w http.ResponseWriter, r *http.Request) { //DONE
+func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
 	var task models.Task
-	if result := c.DB.First(&task, id); result.Error != nil {
+	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Task not found"))
 		return
@@ -72,7 +80,7 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) { //DONE
 	json.NewEncoder(w).Encode(task)
 }
 
-func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) { //DONE
+func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
@@ -90,7 +98,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) { //DONE
 	json.Unmarshal(body, &UpdateTask)
 
 	var task models.Task
-	if result := c.DB.First(&task, id); result.Error != nil {
+	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Task not found"))
 		return
@@ -121,18 +129,18 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) { //DONE
 	json.NewEncoder(w).Encode("Task updated successfully")
 }
 
-func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) { //DONE
+func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
 	var task models.Task
-	if result := c.DB.First(&task, id); result.Error != nil {
+	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Task not found"))
 		return
 	}
 
-	if result := c.DB.Delete(&task, id); result.Error != nil {
+	if result := c.DB.Delete(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		fmt.Println("Error deleting task:" + result.Error.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
