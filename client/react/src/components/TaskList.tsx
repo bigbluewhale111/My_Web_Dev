@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Button } from "react-bootstrap";
-import { FaPencil, FaTrash } from "react-icons/fa6";
-
+import { FaTrash } from "react-icons/fa6";
+import TaskModals from "./TaskModal";
 interface Task {
   id: number;
   name: string;
@@ -56,9 +56,7 @@ function TaskList() {
                   <td>{task.status}</td>
                   <td>
                     <div>
-                      <Button variant="primary" style={{ marginRight: "10px" }}>
-                        <FaPencil style={{ color: "white" }}></FaPencil>
-                      </Button>
+                      <TaskModals task_id={task.id}></TaskModals>
                       <Button
                         variant="danger"
                         onClick={() => deleteHandler(task.id)}
