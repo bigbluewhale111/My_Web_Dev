@@ -13,9 +13,22 @@ import (
 
 var testAuthorId uint32 = 0
 
+func addCorsHeader(res http.ResponseWriter) {
+	headers := res.Header()
+	headers.Add("Access-Control-Allow-Origin", "*")
+	headers.Add("Vary", "Origin")
+	headers.Add("Vary", "Access-Control-Request-Method")
+	headers.Add("Vary", "Access-Control-Request-Headers")
+	headers.Add("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
+	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
+}
+
 func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	var tasks []models.Task
 	if result := c.DB.Where("author_id = ?", testAuthorId).Order("id ASC").Find(&tasks); result.Error != nil {
 		fmt.Println("Error fetching tasks:" + result.Error.Error())
@@ -29,10 +42,15 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
 	if err != nil {
 		fmt.Println("Error reading body:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -42,7 +60,11 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 
 	var newtask models.NewTask
 	json.Unmarshal(body, &newtask)
-
+	if newtask.Name == "" || newtask.Description == "" || newtask.Status > 4 || newtask.Status < 1 || newtask.DueDate == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid Field"))
+		return
+	}
 	if result := c.DB.Create(&models.Task{
 		Name:        newtask.Name,
 		Description: newtask.Description,
@@ -61,10 +83,15 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -77,13 +104,18 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
 	if err != nil {
 		fmt.Println("Error reading body:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -92,6 +124,11 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	var UpdateTask models.NewTask
 	json.Unmarshal(body, &UpdateTask)
+	if UpdateTask.Status > 4 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid Field"))
+		return
+	}
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -104,7 +141,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if UpdateTask.Description != "" {
 		task.Description = UpdateTask.Description
 	}
-	if UpdateTask.Status != "" {
+	if UpdateTask.Status != 0 {
 		task.Status = UpdateTask.Status
 	}
 	if UpdateTask.DueDate != 0 {
@@ -124,10 +161,15 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, testAuthorId); result.Error != nil {
 		w.WriteHeader(http.StatusNotFound)
