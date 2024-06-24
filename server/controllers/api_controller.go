@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/bigbluewhale111/rest_api/models"
@@ -12,6 +13,8 @@ import (
 )
 
 var testAuthorId uint32 = 0
+
+var client_id = os.Getenv("CLIENT_ID")
 
 func addCorsHeader(res http.ResponseWriter) {
 	headers := res.Header()
@@ -186,4 +189,17 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Task deleted successfully")
+}
+
+func Callback(w http.ResponseWriter, r *http.Request) {
+	addCorsHeader(w)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	params := r.URL.Query()
+	code := params.Get("code")
+	fmt.Println(code)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Callback"))
 }

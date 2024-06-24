@@ -18,6 +18,7 @@ func main() {
 	router.HandleFunc("/task_api/task/{id}", c.GetTask).Methods("GET")
 	router.HandleFunc("/task_api/edit/task/{id}", c.UpdateTask).Methods("POST", "OPTIONS")
 	router.HandleFunc("/task_api/delete/task/{id}", c.DeleteTask).Methods("GET")
+	router.HandleFunc("/task_api/callback", controllers.Callback).Methods("GET")
 	log.Println("API is running on port 3000...")
 	http.ListenAndServe(":3000", router)
 }
