@@ -15,13 +15,13 @@ services:
     depends_on:
       - traefik
 
-  api:
+  taskapi:
     build:
       context: ./server
       dockerfile: Dockerfile
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`task.localhost`)"
+      - "traefik.http.routers.taskapi.rule=Host(`task.localhost`)"
     ports:
       - 3000:3000
     environment:
@@ -59,12 +59,12 @@ services:
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
     ports:
-      - "80:80"
-      - "8080:8080" # Traefik dashboard
+      - 80:80
+      - 8080:8080 # Traefik dashboard
     networks:
       - webnet
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
 networks:
   webnet:
   dbnet:
