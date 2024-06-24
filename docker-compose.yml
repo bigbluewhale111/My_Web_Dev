@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`app.localhost`)"
+      - "traefik.http.routers.web.rule=Path(`/`) || Path(`/index.html`) || Path(`/checklist.png`) || Path(`/checklist.ico`) || PathPrefix(`/assets`)"
     ports:
       - 8000:8000
     networks:
@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.taskapi.rule=Host(`task.localhost`)"
+      - "traefik.http.routers.taskapi.rule=PathPrefix(`/task_api`)"
     ports:
       - 3000:3000
     environment:
