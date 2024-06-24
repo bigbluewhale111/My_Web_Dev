@@ -33,7 +33,7 @@ function TaskModals(props: { task_id: number; reload_parent: () => void }) {
   const [showInfo, setShowInfo] = useState(false);
   const handleShowInfo = () => {
     axios
-      .get("http://localhost:3000/api/task/" + props.task_id)
+      .get("http://task.localhost/task/" + props.task_id)
       .then((response) => {
         console.log(response.data);
         let task: Task = response.data;
@@ -61,7 +61,7 @@ function TaskModals(props: { task_id: number; reload_parent: () => void }) {
       sendDueDate = 0;
     }
     axios
-      .post("http://localhost:3000/api/edit/task/" + props.task_id, {
+      .post("http://task.localhost/edit/task/" + props.task_id, {
         name: newName,
         description: newDescription,
         due_date: sendDueDate,

@@ -33,7 +33,7 @@ function AddTaskModal(props: { reload_parent: () => void }) {
       sendDueDate = 0;
     }
     axios
-      .post("http://localhost:3000/api/create/task", {
+      .post("http://task.localhost/create/task", {
         name: newName,
         description: newDescription,
         due_date: sendDueDate,

@@ -1,6 +1,38 @@
 version: "3.8"
 
 services:
+  web:
+    build:
+      context: ./client/react
+      dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`app.localhost`)"
+    ports:
+      - 8000:8000
+    networks:
+      - webnet
+    depends_on:
+      - traefik
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`task.localhost`)"
+    ports:
+      - 3000:3000
+    environment:
+      - DB=postgres://pg:pg_pass123@database:5432/task
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - webnet
+      - dbnet
+
   database:
     container_name: database
     image: postgres:15.6
@@ -9,10 +41,33 @@ services:
       - POSTGRES_USER=pg
       - POSTGRES_PASSWORD=pg_pass123
       - POSTGRES_DB=task
-    ports:
-      - 5433:5432
     volumes:
       - db:/var/lib/postgresql/data
+    networks:
+      - dbnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg -d task"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--log.level=INFO"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080" # Traefik dashboard
+    networks:
+      - webnet
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+networks:
+  webnet:
+  dbnet:
 
 volumes:
   db:

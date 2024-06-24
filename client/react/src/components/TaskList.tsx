@@ -17,7 +17,7 @@ function TaskList() {
   const variantArray = ["secondary", "primary", "warning", "success"];
   const loadTasks = () => {
     axios
-      .get("http://localhost:3000/api/tasks")
+      .get("http://task.localhost/tasks")
       .then((response) => {
         console.log(response.data);
         let tasks: Task[] = response.data;
@@ -32,7 +32,7 @@ function TaskList() {
   }, []);
   const deleteHandler = (id: number) => {
     axios
-      .get("http://localhost:3000/api/delete/task/" + id.toString())
+      .get("http://task.localhost/delete/task/" + id.toString())
       .then(() => {
         setTasks(tasks.filter((task) => task.id !== id));
       })
