@@ -27,4 +27,4 @@ COPY --from=build /app/dist /app
 EXPOSE 8000
 
 # Start the HTTP server
-CMD ["serve", "-s", ".", "-l", "8000"]
+CMD ["npx", "serve", "-l", "8000"]

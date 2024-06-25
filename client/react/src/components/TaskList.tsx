@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+// import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { Table, Button, Badge, Stack } from "react-bootstrap";
 import { FaTrash } from "react-icons/fa6";
 import TaskModals from "./TaskModal";
 import AddTaskModal from "./AddTask";
+import Cookies from "js-cookie";
+
 interface Task {
   id: number;
   name: string;
@@ -17,7 +20,7 @@ function TaskList() {
   const variantArray = ["secondary", "primary", "warning", "success"];
   const loadTasks = () => {
     axios
-      .get("http://localhost/task_api/tasks")
+      .get("/api/tasks")
       .then((response) => {
         console.log(response.data);
         let tasks: Task[] = response.data;
@@ -28,11 +31,19 @@ function TaskList() {
       });
   };
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    var token = urlParams.get("token");
+    console.log(token);
+    if (token == "logout") {
+      Cookies.remove("token");
+    } else if (token) {
+      Cookies.set("token", atob(token));
+    }
     loadTasks();
   }, []);
   const deleteHandler = (id: number) => {
     axios
-      .get("http://localhost/task_api/delete/task/" + id.toString())
+      .get("/api/delete/task/" + id.toString())
       .then(() => {
         setTasks(tasks.filter((task) => task.id !== id));
       })
