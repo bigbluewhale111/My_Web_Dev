@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-// import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { Table, Button, Badge, Stack } from "react-bootstrap";
 import { FaTrash } from "react-icons/fa6";
 import TaskModals from "./TaskModal";
 import AddTaskModal from "./AddTask";
-import Cookies from "js-cookie";
 
 interface Task {
   id: number;
@@ -31,14 +29,6 @@ function TaskList() {
       });
   };
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    var token = urlParams.get("token");
-    console.log(token);
-    if (token == "logout") {
-      Cookies.remove("token");
-    } else if (token) {
-      Cookies.set("token", atob(token));
-    }
     loadTasks();
   }, []);
   const deleteHandler = (id: number) => {

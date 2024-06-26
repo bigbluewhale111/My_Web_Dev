@@ -1,4 +1,5 @@
 import { Navbar, Nav, Container } from "react-bootstrap";
+import Cookies from "js-cookie";
 
 function NavigationBar() {
   return (
@@ -17,7 +18,11 @@ function NavigationBar() {
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
             <Nav.Link href="/">Home</Nav.Link>
-            <Nav.Link href="/api/logout">Logout</Nav.Link>
+            {Cookies.get("token") ? (
+              <Nav.Link href="/redirect?logout=true">Logout</Nav.Link>
+            ) : (
+              <Nav.Link href="/login">Login</Nav.Link>
+            )}
           </Nav>
         </Navbar.Collapse>
       </Container>

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,18 +19,17 @@ var client_id = os.Getenv("CLIENT_ID")         // CREDS
 var client_secret = os.Getenv("CLIENT_SECRET") // CREDS
 var secret = os.Getenv("SECRET")               // CREDS
 
-func addCorsHeader(res http.ResponseWriter) {
-	headers := res.Header()
-	headers.Add("Access-Control-Allow-Origin", "*")
-	headers.Add("Vary", "Origin")
-	headers.Add("Vary", "Access-Control-Request-Method")
-	headers.Add("Vary", "Access-Control-Request-Headers")
-	headers.Add("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
-	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
-}
+// func addCorsHeader(res http.ResponseWriter) {
+// 	headers := res.Header()
+// 	headers.Add("Access-Control-Allow-Origin", "*")
+// 	headers.Add("Vary", "Origin")
+// 	headers.Add("Vary", "Access-Control-Request-Method")
+// 	headers.Add("Vary", "Access-Control-Request-Headers")
+// 	headers.Add("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
+// 	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
+// }
 
 func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -52,7 +50,6 @@ func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -96,7 +93,6 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -119,7 +115,6 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -179,7 +174,6 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -209,7 +203,6 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -256,16 +249,26 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(oauthResponse)
 
 	// get User info
-	req, err = http.NewRequest("GET", "https://api.github.com/user", nil)
+	url := "https://api.github.com/applications/" + client_id + "/token"
+	payload, err := json.Marshal(map[string]string{"access_token": oauthResponse.AccessToken})
+	if err != nil {
+		fmt.Println("Error marshalling payload:" + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+	rreq, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		fmt.Println("Error creating request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+oauthResponse.AccessToken)
-	resp, err = Client.Do(req)
+
+	rreq.Header.Set("Accept", "application/vnd.github+json")
+	rreq.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	rreq.SetBasicAuth(client_id, client_secret)
+	resp, err = Client.Do(rreq)
 	if err != nil {
 		fmt.Println("Error sending request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -280,9 +283,10 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Internal server error"))
 		return
 	}
-	var githubUser models.GithubUser
-	json.Unmarshal(body, &githubUser)
-	fmt.Println(githubUser)
+	var tokenResp models.TokenResponse
+	json.Unmarshal(body, &tokenResp)
+	fmt.Println(tokenResp.Auth_User)
+	var githubUser models.GithubUser = tokenResp.Auth_User
 
 	// save user info to db
 	var user models.User
@@ -305,12 +309,12 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println(tokenString)
 
-	// redirect to frontend
-	http.Redirect(w, r, "http://localhost:80?token="+string(base64.StdEncoding.EncodeToString([]byte(tokenString))), http.StatusSeeOther)
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(tokenString)
 }
 
 func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -359,11 +363,20 @@ func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// clear cookie
-	http.Redirect(w, r, "http://localhost:80?token=logout", http.StatusSeeOther)
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode("Logged out successfully")
+}
+
+func (c controller) LoginAs(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "")
 }
 
 func GetClientID(w http.ResponseWriter, r *http.Request) {
-	addCorsHeader(w)
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(client_id)

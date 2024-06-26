@@ -3,14 +3,14 @@ import NavigationBar from "./components/NavBar";
 import Button from "react-bootstrap/Button";
 import { FaGithub } from "react-icons/fa";
 import axios from "axios";
-// import Cookies from "js-cookie";
+import Cookies from "js-cookie";
 
 function AppLogin() {
-  // if (Cookies.get("token")) {
-  //   window.location.href = "/";
-  // }
   const [clientId, setClientId] = useState("");
   useEffect(() => {
+    if (Cookies.get("token")) {
+      window.location.href = "/";
+    }
     axios
       .get("/auth/client_id")
       .then((res) => {

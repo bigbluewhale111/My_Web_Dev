@@ -22,6 +22,11 @@ type GithubUser struct {
 	Id    uint32 `json:"id"`
 }
 
+type TokenResponse struct {
+	Id        uint32     `json:"id"`
+	Auth_User GithubUser `json:"user"`
+}
+
 type User struct {
 	gorm.Model
 	ID          uint32 `json:"id" gorm:"primaryKey"`
