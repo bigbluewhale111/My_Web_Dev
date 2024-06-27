@@ -2,22 +2,24 @@ package controllers
 
 import (
 	"bytes"
+	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bigbluewhale111/rest_api/models"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 )
 
-var client_id = os.Getenv("CLIENT_ID")         // CREDS
-var client_secret = os.Getenv("CLIENT_SECRET") // CREDS
-var secret = os.Getenv("SECRET")               // CREDS
+var secret = os.Getenv("SECRET") // CREDS
 
 // func addCorsHeader(res http.ResponseWriter) {
 // 	headers := res.Header()
@@ -29,13 +31,36 @@ var secret = os.Getenv("SECRET")               // CREDS
 // 	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
 // }
 
+func handleJWT(AccessToken string, id uint32) (string, time.Time, error) {
+	expiredTime := time.Now().Add(time.Hour * 6)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, models.JWTClaim{
+		AccessToken: AccessToken,
+		Id:          id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiredTime),
+		},
+	})
+	tokenString, err := token.SignedString([]byte(secret))
+	return tokenString, expiredTime, err
+}
+
+func CachingUser(tokenString string, RDB *redis.Client, expiredTime time.Time) error {
+	Md5TokenString := fmt.Sprintf("%x", md5.Sum([]byte(tokenString)))
+	err := RDB.Set(context.Background(), "session:"+Md5TokenString, true, time.Until(expiredTime)).Err()
+	if err != nil {
+		fmt.Println("Error storing token to cache:" + err.Error())
+		return err
+	}
+	return nil
+}
+
 func (c controller) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	authorId := r.Context().Value(UserKey("user")).(models.User).ID
+	authorId := r.Context().Value(UserKey("user")).(models.JWTClaim).Id
 
 	var tasks []models.Task
 	if result := c.DB.Where("author_id = ?", authorId).Order("id ASC").Find(&tasks); result.Error != nil {
@@ -73,7 +98,7 @@ func (c controller) AddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorId := r.Context().Value(UserKey("user")).(models.User).ID
+	authorId := r.Context().Value(UserKey("user")).(models.JWTClaim).Id
 
 	if result := c.DB.Create(&models.Task{
 		Name:        newtask.Name,
@@ -101,7 +126,7 @@ func (c controller) GetTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
-	authorId := r.Context().Value(UserKey("user")).(models.User).ID
+	authorId := r.Context().Value(UserKey("user")).(models.JWTClaim).Id
 
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, authorId); result.Error != nil {
@@ -140,7 +165,7 @@ func (c controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorId := r.Context().Value(UserKey("user")).(models.User).ID
+	authorId := r.Context().Value(UserKey("user")).(models.JWTClaim).Id
 
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, authorId); result.Error != nil {
@@ -182,7 +207,7 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var id, _ = strconv.Atoi(vars["id"])
 
-	authorId := r.Context().Value(UserKey("user")).(models.User).ID
+	authorId := r.Context().Value(UserKey("user")).(models.JWTClaim).Id
 
 	var task models.Task
 	if result := c.DB.First(&task, "id = ? AND author_id = ?", id, authorId); result.Error != nil {
@@ -209,20 +234,29 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	// get code params from callback
 	params := r.URL.Query()
-	code := params.Get("code")
-	fmt.Println(code)
+	token := params.Get("token")
+	fmt.Println(token)
+	if token == "" {
+		fmt.Println("Invalid token")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Invalid token"))
+		return
+	}
 
-	// get access token
-	jsonData := []byte(`{"client_id":"` + client_id + `","client_secret":"` + client_secret + `","code":"` + code + `"}`)
-	req, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBuffer(jsonData))
+	// Validate token
+	url := os.Getenv("OAUTH_URL") + "/validate"
+	payload, err := json.Marshal(map[string]string{"token": token})
+	if err != nil {
+		fmt.Println("Error marshalling payload:" + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		fmt.Println("Error creating request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
-		return
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
 	tr := &http.Transport{
 		MaxIdleConns:       10,
 		IdleConnTimeout:    30 * time.Second,
@@ -234,73 +268,22 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error sending request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
+	}
+	if resp.StatusCode != 200 {
+		fmt.Println("Invalid token")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Invalid token"))
 		return
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-	var oauthResponse models.OauthResponse
-	json.Unmarshal(body, &oauthResponse)
-	fmt.Println(oauthResponse)
-
-	// get User info
-	url := "https://api.github.com/applications/" + client_id + "/token"
-	payload, err := json.Marshal(map[string]string{"access_token": oauthResponse.AccessToken})
-	if err != nil {
-		fmt.Println("Error marshalling payload:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-	rreq, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
-	if err != nil {
-		fmt.Println("Error creating request:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-
-	rreq.Header.Set("Accept", "application/vnd.github+json")
-	rreq.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	rreq.SetBasicAuth(client_id, client_secret)
-	resp, err = Client.Do(rreq)
-	if err != nil {
-		fmt.Println("Error sending request:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-	defer resp.Body.Close()
-	body, err = io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-	var tokenResp models.TokenResponse
-	json.Unmarshal(body, &tokenResp)
-	fmt.Println(tokenResp.Auth_User)
-	var githubUser models.GithubUser = tokenResp.Auth_User
 
 	// save user info to db
+	UserToken := strings.Split(token, "_")
 	var user models.User
-	c.DB.Where(models.User{GithubId: githubUser.Id}).Assign(models.User{Username: githubUser.Login, AccessToken: oauthResponse.AccessToken}).FirstOrCreate(&user)
+	c.DB.Where(models.User{Username: UserToken[0]}).FirstOrCreate(&user)
 	fmt.Println(user)
+
 	// create JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, models.JWTClaim{
-		Username: user.Username,
-		Id:       user.ID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
-		},
-	})
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, expiredTime, err := handleJWT(token, user.ID)
 	if err != nil {
 		fmt.Println("Error creating token:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -308,6 +291,15 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println(tokenString)
+
+	// store to cache redis hash map with key as md5 of tokenString, value as CachedUser
+	err = CachingUser(tokenString, c.RDB, expiredTime)
+	if err != nil {
+		fmt.Println("Error storing token to cache:" + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
 
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -319,30 +311,28 @@ func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	Md5TokenString := r.Context().Value(UserKey("token")).(string)
+	if err := c.RDB.Del(context.Background(), "session:"+Md5TokenString).Err(); err != nil {
+		fmt.Println("Error deleting token from cache:" + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
 
-	url := "https://api.github.com/applications/" + client_id + "/token"
-
-	userAcessToken := r.Context().Value(UserKey("user")).(models.User).AccessToken
-
-	payload, err := json.Marshal(map[string]string{"access_token": userAcessToken})
+	token := r.Context().Value(UserKey("user")).(models.JWTClaim).AccessToken
+	url := os.Getenv("OAUTH_URL") + "/revoke"
+	payload, err := json.Marshal(map[string]string{"token": token})
 	if err != nil {
 		fmt.Println("Error marshalling payload:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
-		return
 	}
-
-	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer([]byte(payload)))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		fmt.Println("Error creating request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
-		return
 	}
-
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.SetBasicAuth(client_id, client_secret)
 	tr := &http.Transport{
 		MaxIdleConns:       10,
 		IdleConnTimeout:    30 * time.Second,
@@ -354,30 +344,25 @@ func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error sending request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
+	}
+	if resp.StatusCode != 200 {
+		fmt.Println("Invalid token")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Invalid token"))
 		return
 	}
-	if resp.StatusCode != 204 {
-		fmt.Println("Error deleting token:" + strconv.Itoa(resp.StatusCode))
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
-	}
-	// clear cookie
+
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Logged out successfully")
 }
 
-func (c controller) LoginAs(w http.ResponseWriter, r *http.Request) {
+func GetOauthURL(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	http.Redirect(w, r, "")
-}
-
-func GetClientID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(client_id)
+	json.NewEncoder(w).Encode(os.Getenv("OAUTH_URL"))
 }

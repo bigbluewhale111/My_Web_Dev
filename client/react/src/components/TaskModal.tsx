@@ -1,16 +1,14 @@
 import axios from "axios";
 import { useState } from "react";
-import {
-  Button,
-  Modal,
-  DropdownButton,
-  Dropdown,
-  ButtonGroup,
-  Badge,
-  Form,
-  Alert,
-  Stack,
-} from "react-bootstrap";
+import Button from "react-bootstrap/Button";
+import Modal from "react-bootstrap/Modal";
+import DropdownButton from "react-bootstrap/DropdownButton";
+import Dropdown from "react-bootstrap/Dropdown";
+import ButtonGroup from "react-bootstrap/ButtonGroup";
+import Badge from "react-bootstrap/Badge";
+import Form from "react-bootstrap/Form";
+import Alert from "react-bootstrap/Alert";
+import Stack from "react-bootstrap/Stack";
 import { FaInfo } from "react-icons/fa6";
 
 interface Task {

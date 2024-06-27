@@ -1,4 +1,6 @@
-import { Navbar, Nav, Container } from "react-bootstrap";
+import Navbar from "react-bootstrap/Navbar";
+import Nav from "react-bootstrap/Nav";
+import Container from "react-bootstrap/Container";
 import Cookies from "js-cookie";
 
 function NavigationBar() {
@@ -19,7 +21,9 @@ function NavigationBar() {
           <Nav className="me-auto">
             <Nav.Link href="/">Home</Nav.Link>
             {Cookies.get("token") ? (
-              <Nav.Link href="/redirect?logout=true">Logout</Nav.Link>
+              <>
+                <Nav.Link href="/redirect?logout=true">Logout</Nav.Link>
+              </>
             ) : (
               <Nav.Link href="/login">Login</Nav.Link>
             )}

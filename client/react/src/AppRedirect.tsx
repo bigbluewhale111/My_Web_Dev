@@ -3,7 +3,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 function AppRedirect() {
-  const [authenticated, setAthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [logedout, setLogedout] = useState(false);
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -12,28 +12,31 @@ function AppRedirect() {
       axios
         .get("/api/logout")
         .then((response) => {
-          setLogedout(true);
           console.log(response.data);
+          Cookies.remove("token");
+          setLogedout(true);
         })
         .catch((error) => {
           console.error("Error logging out:", error);
+        })
+        .finally(() => {
+          return;
         });
-      Cookies.remove("token");
-      return;
     }
-    var code = urlParams.get("code");
-    axios
-      .get("/auth/callback?code=" + code)
-      .then((response) => {
-        var token = response.data;
-        Cookies.set("token", token);
-        console.log(token);
-        setAthenticated(true);
-      })
-      .catch((error) => {
-        console.error("Error fetching token:", error);
-      });
-  });
+    var token = urlParams.get("token");
+    if (token) {
+      axios
+        .get("/auth/callback?token=" + token)
+        .then((response) => {
+          var CookieToken = response.data;
+          Cookies.set("token", CookieToken);
+          setAuthenticated(true);
+        })
+        .catch((error) => {
+          console.error("Error fetching token:", error);
+        });
+    }
+  }, []);
   return (
     <>
       {logedout ? (

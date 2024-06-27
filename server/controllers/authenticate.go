@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,24 +32,32 @@ func (c controller) Authenticate(next http.Handler) http.Handler {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		claims, ok := token.Claims.(*models.JWTClaim)
-		if !ok || !token.Valid {
+		claim := token.Claims.(*models.JWTClaim)
+		if !token.Valid {
 			log.Println("Unauthorized")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// temporary get to the database, we will setup redis and read cache which is much faster
-		var user models.User
-		if result := c.DB.First(&user, "id = ? AND username = ?", claims.Id, claims.Username); result.Error != nil {
+
+		Md5TokenString := fmt.Sprintf("%x", md5.Sum([]byte(tokenString.Value)))
+		fmt.Println(Md5TokenString)
+		login, err := c.RDB.Get(context.Background(), "session:"+Md5TokenString).Result()
+		if err != nil {
 			log.Println("Unauthorized")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		log.Println("Authorized")
-		fmt.Println(user)
+		if login != "true" {
+			log.Println("Unauthorized")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		fmt.Println(login)
 
 		// Add user to context
-		ctx := context.WithValue(r.Context(), UserKey("user"), user)
+		ctx := context.WithValue(r.Context(), UserKey("user"), *claim)
+		ctx = context.WithValue(ctx, UserKey("token"), Md5TokenString)
 
 		// Call the next handler, which can be another middleware in the chain, or the final handler.
 		next.ServeHTTP(w, r.WithContext(ctx))

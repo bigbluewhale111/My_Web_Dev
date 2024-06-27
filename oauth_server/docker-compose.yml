@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  databaseoauth:
+    container_name: database_oauth
+    image: postgres:15.6
+    restart: always
+    environment:
+      - POSTGRES_USER=pg
+      - POSTGRES_PASSWORD=pg_pass123
+      - POSTGRES_DB=oauth
+    volumes:
+      - dboauth:/var/lib/postgresql/data
+    ports:
+      - 5433:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg -d oauth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dboauth:

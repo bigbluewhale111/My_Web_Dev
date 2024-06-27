@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:latest # Use the latest Redis image
+    ports:
+      - "6379:6379" # Map port 6379 on the host to port 6379 on the container
+    volumes:
+      - cache:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_reverse_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+
+  database:
+    container_name: database
+    image: postgres:15.6
+    restart: always
+    environment:
+      - POSTGRES_USER=pg
+      - POSTGRES_PASSWORD=pg_pass123
+      - POSTGRES_DB=task
+    ports:
+      - 5434:5432
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg -d task"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db:
+  cache:

@@ -1,15 +1,13 @@
 import axios from "axios";
 import { useState } from "react";
-import {
-  Modal,
-  Button,
-  Form,
-  Stack,
-  Alert,
-  DropdownButton,
-  Dropdown,
-  ButtonGroup,
-} from "react-bootstrap";
+import Modal from "react-bootstrap/Modal";
+import Button from "react-bootstrap/Button";
+import Form from "react-bootstrap/Form";
+import Stack from "react-bootstrap/Stack";
+import Alert from "react-bootstrap/Alert";
+import DropdownButton from "react-bootstrap/DropdownButton";
+import Dropdown from "react-bootstrap/Dropdown";
+import ButtonGroup from "react-bootstrap/ButtonGroup";
 import { FaPlus } from "react-icons/fa6";
 
 function AddTaskModal(props: { reload_parent: () => void }) {

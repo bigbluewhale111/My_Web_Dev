@@ -4,21 +4,21 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/bigbluewhale111/rest_api/cache"
 	"github.com/bigbluewhale111/rest_api/controllers"
 	"github.com/bigbluewhale111/rest_api/db"
-	"github.com/bigbluewhale111/rest_api/models"
 	"github.com/gorilla/mux"
 )
 
 func main() {
 	DB := db.Init()
-	DB.AutoMigrate(&models.Task{}, &models.User{})
-	c := controllers.New(DB)
+	RDB := cache.Init()
+	c := controllers.New(DB, RDB)
 	router := mux.NewRouter()
 
 	unauthenticatedSubRouter := router.PathPrefix("/auth").Subrouter()
 	unauthenticatedSubRouter.HandleFunc("/callback", c.Callback).Methods("GET")
-	unauthenticatedSubRouter.HandleFunc("/client_id", controllers.GetClientID).Methods("GET")
+	unauthenticatedSubRouter.HandleFunc("/getOauthURL", controllers.GetOauthURL).Methods("GET")
 
 	authenticatedSubRouter := router.PathPrefix("/api").Subrouter()
 	authenticatedSubRouter.Use(c.Authenticate)
@@ -29,6 +29,6 @@ func main() {
 	authenticatedSubRouter.HandleFunc("/delete/task/{id}", c.DeleteTask).Methods("GET")
 	authenticatedSubRouter.HandleFunc("/logout", c.Logout).Methods("GET")
 
-	log.Println("API is running on port 3000...")
-	http.ListenAndServe(":3000", router)
+	log.Println("API is running on port 7001...")
+	http.ListenAndServe(":7001", router)
 }

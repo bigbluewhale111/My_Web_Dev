@@ -6,20 +6,20 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 function AppLogin() {
-  const [clientId, setClientId] = useState("");
+  const [oauth2Url, setOauth2Url] = useState("");
   useEffect(() => {
     if (Cookies.get("token")) {
       window.location.href = "/";
     }
     axios
-      .get("/auth/client_id")
+      .get("/auth/getOauthURL")
       .then((res) => {
-        setClientId(res.data);
+        setOauth2Url(res.data);
       })
       .catch((error) => {
-        console.error("Error fetching client_id:", error);
+        console.error("Error fetching oauth2 url:", error);
       });
-  });
+  }, []);
   return (
     <div className="AppLogin">
       <NavigationBar />
@@ -27,17 +27,22 @@ function AppLogin() {
       <div style={{ textAlign: "center" }}>
         <h1>Login</h1>
         <p>You are not logged in, please login with Github</p>
-        {clientId === "" ? (
-          <p>Cannot get client_id</p>
+        {oauth2Url === "" ? (
+          <p>Cannot get Oauth2 URL</p>
         ) : (
-          <Button
-            variant="success"
-            href={
-              "https://github.com/login/oauth/authorize?client_id=" + clientId
-            }
-          >
-            Login with Github <FaGithub></FaGithub>
-          </Button>
+          <>
+            <Button
+              variant="success"
+              href={
+                oauth2Url +
+                "/login?callback_url=" +
+                document.location.origin +
+                "/redirect"
+              }
+            >
+              Login with My OAUTH <FaGithub></FaGithub>
+            </Button>
+          </>
         )}
       </div>
     </div>

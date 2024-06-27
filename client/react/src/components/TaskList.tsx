@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Table, Button, Badge, Stack } from "react-bootstrap";
+import Table from "react-bootstrap/Table";
+import Badge from "react-bootstrap/Badge";
+import Button from "react-bootstrap/Button";
+import Stack from "react-bootstrap/Stack";
 import { FaTrash } from "react-icons/fa6";
 import TaskModals from "./TaskModal";
 import AddTaskModal from "./AddTask";
