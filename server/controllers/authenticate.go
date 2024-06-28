@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/bigbluewhale111/rest_api/models"
 	"github.com/golang-jwt/jwt/v5"
@@ -22,10 +23,10 @@ func (c controller) Authenticate(next http.Handler) http.Handler {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-
+		fmt.Println(tokenString.Value)
 		// jwt
 		token, err := jwt.ParseWithClaims(tokenString.Value, &models.JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(secret), nil
+			return []byte(JWTSecret), nil
 		})
 		if err != nil {
 			log.Println("Unauthorized")
@@ -39,25 +40,25 @@ func (c controller) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
+		fmt.Println(claim)
+
 		Md5TokenString := fmt.Sprintf("%x", md5.Sum([]byte(tokenString.Value)))
 		fmt.Println(Md5TokenString)
-		login, err := c.RDB.Get(context.Background(), "session:"+Md5TokenString).Result()
+		userId, err := c.RDB.Get(context.Background(), "session:"+Md5TokenString).Result()
 		if err != nil {
 			log.Println("Unauthorized")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if login != "true" {
+
+		if userId != strconv.Itoa(int((*claim).Id)) {
 			log.Println("Unauthorized")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		fmt.Println(login)
-
 		// Add user to context
 		ctx := context.WithValue(r.Context(), UserKey("user"), *claim)
-		ctx = context.WithValue(ctx, UserKey("token"), Md5TokenString)
 
 		// Call the next handler, which can be another middleware in the chain, or the final handler.
 		next.ServeHTTP(w, r.WithContext(ctx))

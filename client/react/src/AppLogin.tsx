@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import NavigationBar from "./components/NavBar";
 import Button from "react-bootstrap/Button";
-import { FaGithub } from "react-icons/fa";
 import axios from "axios";
 import Cookies from "js-cookie";
 
@@ -35,12 +34,12 @@ function AppLogin() {
               variant="success"
               href={
                 oauth2Url +
-                "/login?callback_url=" +
+                "/login?callback=" +
                 document.location.origin +
                 "/redirect"
               }
             >
-              Login with My OAUTH <FaGithub></FaGithub>
+              Login with My OAUTH
             </Button>
           </>
         )}

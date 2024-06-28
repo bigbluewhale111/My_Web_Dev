@@ -17,8 +17,10 @@ func main() {
 	router := mux.NewRouter()
 
 	unauthenticatedSubRouter := router.PathPrefix("/auth").Subrouter()
-	unauthenticatedSubRouter.HandleFunc("/callback", c.Callback).Methods("GET")
 	unauthenticatedSubRouter.HandleFunc("/getOauthURL", controllers.GetOauthURL).Methods("GET")
+	unauthenticatedSubRouter.HandleFunc("/getOauthClientURL", controllers.GetOauthClientURL).Methods("GET")
+	unauthenticatedSubRouter.HandleFunc("/authorize", c.Authorize).Methods("GET")
+	unauthenticatedSubRouter.HandleFunc("/logout", c.Logout).Methods("POST")
 
 	authenticatedSubRouter := router.PathPrefix("/api").Subrouter()
 	authenticatedSubRouter.Use(c.Authenticate)
@@ -27,7 +29,6 @@ func main() {
 	authenticatedSubRouter.HandleFunc("/task/{id}", c.GetTask).Methods("GET")
 	authenticatedSubRouter.HandleFunc("/edit/task/{id}", c.UpdateTask).Methods("POST", "OPTIONS")
 	authenticatedSubRouter.HandleFunc("/delete/task/{id}", c.DeleteTask).Methods("GET")
-	authenticatedSubRouter.HandleFunc("/logout", c.Logout).Methods("GET")
 
 	log.Println("API is running on port 7001...")
 	http.ListenAndServe(":7001", router)

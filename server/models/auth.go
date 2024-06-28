@@ -6,8 +6,7 @@ import (
 )
 
 type JWTClaim struct {
-	AccessToken string `json:"access_token"`
-	Id          uint32 `json:"id"`
+	Id uint32 `json:"id"`
 	jwt.RegisteredClaims
 }
 
@@ -15,4 +14,9 @@ type User struct {
 	gorm.Model
 	ID       uint32 `json:"id" gorm:"primaryKey"`
 	Username string `json:"username" gorm:"unique"`
+}
+
+type JWTAccessToken struct {
+	AccessToken string `json:"access_token"`
+	jwt.RegisteredClaims
 }

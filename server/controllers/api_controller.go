@@ -19,7 +19,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var secret = os.Getenv("SECRET") // CREDS
+var JWTSecret = os.Getenv("JWTSECRET") // CREDS
+var OAUTH_CLIENT_URL = os.Getenv("OAUTH_CLIENT_URL")
+var OAUTH_URL = os.Getenv("OAUTH_URL")
 
 // func addCorsHeader(res http.ResponseWriter) {
 // 	headers := res.Header()
@@ -31,22 +33,21 @@ var secret = os.Getenv("SECRET") // CREDS
 // 	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
 // }
 
-func handleJWT(AccessToken string, id uint32) (string, time.Time, error) {
+func handleJWT(id uint32) (string, time.Time, error) {
 	expiredTime := time.Now().Add(time.Hour * 6)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, models.JWTClaim{
-		AccessToken: AccessToken,
-		Id:          id,
+		Id: id,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiredTime),
 		},
 	})
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, err := token.SignedString([]byte(JWTSecret))
 	return tokenString, expiredTime, err
 }
 
-func CachingUser(tokenString string, RDB *redis.Client, expiredTime time.Time) error {
+func CachingUser(userId uint32, tokenString string, RDB *redis.Client, expiredTime time.Time) error {
 	Md5TokenString := fmt.Sprintf("%x", md5.Sum([]byte(tokenString)))
-	err := RDB.Set(context.Background(), "session:"+Md5TokenString, true, time.Until(expiredTime)).Err()
+	err := RDB.Set(context.Background(), "session:"+Md5TokenString, strconv.Itoa(int(userId)), time.Until(expiredTime)).Err()
 	if err != nil {
 		fmt.Println("Error storing token to cache:" + err.Error())
 		return err
@@ -227,25 +228,34 @@ func (c controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Task deleted successfully")
 }
 
-func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
+func (c controller) Authorize(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	// get code params from callback
-	params := r.URL.Query()
-	token := params.Get("token")
-	fmt.Println(token)
-	if token == "" {
-		fmt.Println("Invalid token")
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte("Invalid token"))
+	AuthorizationHeader := r.Header.Get("Authorization")
+	if AuthorizationHeader == "" {
+		fmt.Println("No Authorization Header")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Unauthorized"))
 		return
 	}
 
-	// Validate token
-	url := os.Getenv("OAUTH_URL") + "/validate"
-	payload, err := json.Marshal(map[string]string{"token": token})
+	tokenString := strings.Split(AuthorizationHeader, " ")[1]
+	var AccessTokenClaim models.JWTAccessToken
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaim, func(token *jwt.Token) (interface{}, error) {
+		return []byte(JWTSecret), nil
+	})
+	if err != nil || token == nil || !token.Valid {
+		fmt.Println("Error parsing token:" + err.Error())
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Unauthorized"))
+		return
+	}
+
+	claimToken := token.Claims.(*models.JWTAccessToken)
+	url := OAUTH_URL + "/validate"
+	payload, err := json.Marshal(map[string]string{"token": claimToken.AccessToken})
 	if err != nil {
 		fmt.Println("Error marshalling payload:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -257,12 +267,7 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 	}
-	tr := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
-		DisableCompression: true,
-	}
-	Client := &http.Client{Transport: tr}
+	Client := &http.Client{}
 	resp, err := Client.Do(req)
 	if err != nil {
 		fmt.Println("Error sending request:" + err.Error())
@@ -275,25 +280,29 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Invalid token"))
 		return
 	}
+	defer resp.Body.Close()
 
-	// save user info to db
-	UserToken := strings.Split(token, "_")
-	var user models.User
-	c.DB.Where(models.User{Username: UserToken[0]}).FirstOrCreate(&user)
-	fmt.Println(user)
-
-	// create JWT
-	tokenString, expiredTime, err := handleJWT(token, user.ID)
+	username, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error creating token:" + err.Error())
+		fmt.Println("Error reading response body:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
 	}
-	fmt.Println(tokenString)
 
-	// store to cache redis hash map with key as md5 of tokenString, value as CachedUser
-	err = CachingUser(tokenString, c.RDB, expiredTime)
+	var user models.User
+	c.DB.Where(models.User{Username: string(username)}).FirstOrCreate(&user)
+	fmt.Println(user)
+
+	tokenSession, expiredTime, err := handleJWT(user.ID)
+	if err != nil {
+		fmt.Println("Error creating session token:" + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	err = CachingUser(user.ID, tokenSession, c.RDB, expiredTime)
 	if err != nil {
 		fmt.Println("Error storing token to cache:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -303,7 +312,7 @@ func (c controller) Callback(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(tokenString)
+	json.NewEncoder(w).Encode(tokenSession)
 }
 
 func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
@@ -311,47 +320,20 @@ func (c controller) Logout(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	Md5TokenString := r.Context().Value(UserKey("token")).(string)
+	tokenString := r.FormValue("session")
+	if tokenString == "" {
+		fmt.Println("No token provided")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("No token provided"))
+		return
+	}
+	Md5TokenString := fmt.Sprintf("%x", md5.Sum([]byte(tokenString)))
 	if err := c.RDB.Del(context.Background(), "session:"+Md5TokenString).Err(); err != nil {
 		fmt.Println("Error deleting token from cache:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
 	}
-
-	token := r.Context().Value(UserKey("user")).(models.JWTClaim).AccessToken
-	url := os.Getenv("OAUTH_URL") + "/revoke"
-	payload, err := json.Marshal(map[string]string{"token": token})
-	if err != nil {
-		fmt.Println("Error marshalling payload:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-	}
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
-	if err != nil {
-		fmt.Println("Error creating request:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-	}
-	tr := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
-		DisableCompression: true,
-	}
-	Client := &http.Client{Transport: tr}
-	resp, err := Client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:" + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-	}
-	if resp.StatusCode != 200 {
-		fmt.Println("Invalid token")
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte("Invalid token"))
-		return
-	}
-
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode("Logged out successfully")
@@ -364,5 +346,15 @@ func GetOauthURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(os.Getenv("OAUTH_URL"))
+	json.NewEncoder(w).Encode(OAUTH_URL)
+}
+
+func GetOauthClientURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(OAUTH_CLIENT_URL)
 }

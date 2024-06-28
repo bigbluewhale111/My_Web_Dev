@@ -5,12 +5,12 @@ import Cookies from "js-cookie";
 function AppRedirect() {
   const [authenticated, setAuthenticated] = useState(false);
   const [logedout, setLogedout] = useState(false);
-  useEffect(() => {
+  const handlingRedirect = (OauthClientURL: string) => {
     const urlParams = new URLSearchParams(window.location.search);
     var logout = urlParams.get("logout");
     if (logout) {
       axios
-        .get("/api/logout")
+        .get(OauthClientURL + "/logout?session=" + Cookies.get("token"))
         .then((response) => {
           console.log(response.data);
           Cookies.remove("token");
@@ -23,10 +23,10 @@ function AppRedirect() {
           return;
         });
     }
-    var token = urlParams.get("token");
-    if (token) {
+    var code = urlParams.get("code");
+    if (code) {
       axios
-        .get("/auth/callback?token=" + token)
+        .get(OauthClientURL + "/callback?code=" + code)
         .then((response) => {
           var CookieToken = response.data;
           Cookies.set("token", CookieToken);
@@ -36,6 +36,18 @@ function AppRedirect() {
           console.error("Error fetching token:", error);
         });
     }
+  };
+  useEffect(() => {
+    axios
+      .get("/auth/getOauthClientURL")
+      .then((response) => {
+        console.log("OauthClientURL:", response.data);
+        handlingRedirect(response.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching OauthClientURL:", error);
+        return;
+      });
   }, []);
   return (
     <>
