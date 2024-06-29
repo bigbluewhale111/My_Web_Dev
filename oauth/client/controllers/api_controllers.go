@@ -14,11 +14,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var ClientID = os.Getenv("CLIENT_ID")
-var ClientSecret = os.Getenv("CLIENT_SECRET")
-var OAUTH_SERVER_URL = os.Getenv("OAUTH_SERVER_URL")
-var JWTSecret = os.Getenv("JWTSECRET")
-var rest_api = os.Getenv("REST_API")
 
 func HandlingCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,29 +34,35 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Code: ", code)
 	data := url.Values{}
 	data.Add("code", code)
-	data.Add("redirect_uri", "http://localhost:7003/callback")
 	// make request to oauth server to get access token
-	req, err := http.NewRequest("POST", OAUTH_SERVER_URL+"/oauth/token", strings.NewReader(data.Encode()))
+	fmt.Println("Oauth server url: ", os.Getenv("OAUTH_SERVER_URL"))
+	req, err := http.NewRequest("POST", os.Getenv("OAUTH_SERVER_URL")+"/oauth/token", strings.NewReader(data.Encode()))
 	if err != nil {
+		fmt.Println("Error in creating request: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(ClientID, ClientSecret)
+	fmt.Println("Client ID: ", os.Getenv("CLIENT_ID"))
+	fmt.Println("Client Secret: ", os.Getenv("CLIENT_SECRET"))
+	req.SetBasicAuth(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	client := &http.Client{}
+	
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Println("Error in sending request: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Failed to get access token", resp.StatusCode)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Oauth client configured incorrectly"))
 		return
 	}
-
+	
 	defer resp.Body.Close()
 	var access_token models.AccessToken
 	err = json.NewDecoder(resp.Body).Decode(&access_token)
@@ -79,14 +80,14 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt: jwt.NewNumericDate(expiredTime),
 		},
 	})
-	tokenString, err := token.SignedString([]byte(JWTSecret))
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWTSECRET")))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	req, err = http.NewRequest("GET", rest_api+"/auth/authorize", nil)
+	req, err = http.NewRequest("GET", os.Getenv("REST_API")+"/auth/authorize", nil)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -124,7 +125,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	data := url.Values{}
 	data.Add("session", sessionToken)
 
-	req, err := http.NewRequest("POST", rest_api+"/auth/logout", strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", os.Getenv("REST_API")+"/auth/logout", strings.NewReader(data.Encode()))
 	if err != nil {
 		fmt.Println("Error in creating request: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -147,7 +148,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token, err := jwt.ParseWithClaims(sessionToken, &models.JWTAccessToken{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(JWTSecret), nil
+		return []byte(os.Getenv("JWTSECRET")), nil
 	})
 	if err != nil {
 		fmt.Println("Unauthorized")
@@ -170,14 +171,14 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	req, err = http.NewRequest("POST", OAUTH_SERVER_URL+"/oauth/revoke", strings.NewReader(string(payload)))
+	req, err = http.NewRequest("POST", os.Getenv("OAUTH_SERVER_URL")+"/oauth/revoke", strings.NewReader(string(payload)))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(ClientID, ClientSecret)
+	req.SetBasicAuth(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	resp, err = client.Do(req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
