@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"os"
 
 	"github.com/bigbluewhale111/rest_api/models"
 	"github.com/golang-jwt/jwt/v5"
@@ -26,7 +27,7 @@ func (c controller) Authenticate(next http.Handler) http.Handler {
 		fmt.Println(tokenString.Value)
 		// jwt
 		token, err := jwt.ParseWithClaims(tokenString.Value, &models.JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(JWTSecret), nil
+			return []byte(os.Getenv("JWTSECRET")), nil
 		})
 		if err != nil {
 			log.Println("Unauthorized")
