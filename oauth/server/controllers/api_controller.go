@@ -14,7 +14,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var secret = os.Getenv("SECRET")
 
 func (c controller) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
@@ -84,7 +83,7 @@ func (c controller) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorize_code := fmt.Sprintf("%x", md5.Sum([]byte(username+secret+time.Now().String())))
+	authorize_code := fmt.Sprintf("%x", md5.Sum([]byte(username+os.Getenv("SECRET")+time.Now().String())))
 	err = c.RDB.Set(r.Context(), "authcode:"+authorize_code, username, time.Minute*10).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -144,12 +143,6 @@ func (c controller) RevokeToken(w http.ResponseWriter, r *http.Request) {
 
 func (c controller) SendToken(w http.ResponseWriter, r *http.Request) {
 
-	redirect_uri := r.FormValue("redirect_uri")
-	if redirect_uri != "http://localhost:7003/callback" {
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte("Hacker ?"))
-		return
-	}
 	code := r.FormValue("code")
 	userName, err := c.RDB.Get(r.Context(), "authcode:"+code).Result()
 	if err != nil {
@@ -158,7 +151,7 @@ func (c controller) SendToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	AccessToken := sha256.Sum256([]byte(userName + secret + time.Now().String()))
+	AccessToken := sha256.Sum256([]byte(userName + os.Getenv("SECRET") + time.Now().String()))
 
 	tokenString := fmt.Sprintf("%x", AccessToken)
 
@@ -180,9 +173,9 @@ func (c controller) SendToken(w http.ResponseWriter, r *http.Request) {
 
 func ServeFileLogin(w http.ResponseWriter, r *http.Request) {
 	// Serve the login.html file
-	http.ServeFile(w, r, "./dist/login.html")
+	http.ServeFile(w, r, "./oauthdist/login.html")
 }
 func ServeFileRegister(w http.ResponseWriter, r *http.Request) {
 	// Serve the login.html file
-	http.ServeFile(w, r, "./dist/register.html")
+	http.ServeFile(w, r, "./oauthdist/register.html")
 }
