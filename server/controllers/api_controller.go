@@ -19,19 +19,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var JWTSecret = os.Getenv("JWTSECRET") // CREDS
-var OAUTH_CLIENT_URL = os.Getenv("OAUTH_CLIENT_URL")
-var OAUTH_URL = os.Getenv("OAUTH_URL")
-
-// func addCorsHeader(res http.ResponseWriter) {
-// 	headers := res.Header()
-// 	headers.Add("Access-Control-Allow-Origin", "*")
-// 	headers.Add("Vary", "Origin")
-// 	headers.Add("Vary", "Access-Control-Request-Method")
-// 	headers.Add("Vary", "Access-Control-Request-Headers")
-// 	headers.Add("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
-// 	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
-// }
 
 func handleJWT(id uint32) (string, time.Time, error) {
 	expiredTime := time.Now().Add(time.Hour * 6)
@@ -41,7 +28,7 @@ func handleJWT(id uint32) (string, time.Time, error) {
 			ExpiresAt: jwt.NewNumericDate(expiredTime),
 		},
 	})
-	tokenString, err := token.SignedString([]byte(JWTSecret))
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWTSECRET")))
 	return tokenString, expiredTime, err
 }
 
@@ -244,7 +231,7 @@ func (c controller) Authorize(w http.ResponseWriter, r *http.Request) {
 	tokenString := strings.Split(AuthorizationHeader, " ")[1]
 	var AccessTokenClaim models.JWTAccessToken
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaim, func(token *jwt.Token) (interface{}, error) {
-		return []byte(JWTSecret), nil
+		return []byte(os.Getenv("JWTSECRET")), nil
 	})
 	if err != nil || token == nil || !token.Valid {
 		fmt.Println("Error parsing token:" + err.Error())
@@ -254,7 +241,7 @@ func (c controller) Authorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claimToken := token.Claims.(*models.JWTAccessToken)
-	url := OAUTH_URL + "/validate"
+	url := os.Getenv("OAUTH_URL") + "/validate"
 	payload, err := json.Marshal(map[string]string{"token": claimToken.AccessToken})
 	if err != nil {
 		fmt.Println("Error marshalling payload:" + err.Error())
@@ -267,8 +254,8 @@ func (c controller) Authorize(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 	}
-	Client := &http.Client{}
-	resp, err := Client.Do(req)
+	// Client := &http.Client{}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Error sending request:" + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -346,7 +333,7 @@ func GetOauthURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(OAUTH_URL)
+	json.NewEncoder(w).Encode(os.Getenv("OAUTH_URL"))
 }
 
 func GetOauthClientURL(w http.ResponseWriter, r *http.Request) {
@@ -356,5 +343,5 @@ func GetOauthClientURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(OAUTH_CLIENT_URL)
+	json.NewEncoder(w).Encode(os.Getenv("OAUTH_CLIENT_URL"))
 }
